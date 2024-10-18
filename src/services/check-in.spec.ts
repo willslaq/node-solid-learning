@@ -1,14 +1,27 @@
 import { InMemoryCheckinsRepository } from '@/repositories/in-memory/in-memory-check-ins-repository'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CheckinService } from './check-in.service'
+import { InMemoryGymsRepository } from '@/repositories/in-memory/in-memory-gym-repository'
+import { Decimal } from '@prisma/client/runtime/library'
 
 let checkInsRepository: InMemoryCheckinsRepository
+let gymsRepository: InMemoryGymsRepository
 let checkInService: CheckinService
 
 describe('Check-in service', () => {
   beforeEach(() => {
     checkInsRepository = new InMemoryCheckinsRepository()
-    checkInService = new CheckinService(checkInsRepository)
+    gymsRepository = new InMemoryGymsRepository()
+    checkInService = new CheckinService(checkInsRepository, gymsRepository)
+
+    gymsRepository.items.push({
+      id: 'gym-1',
+      title: 'JavaScript Gym',
+      description: '',
+      phone: '',
+      latitude: new Decimal(-23.7879528),
+      longitude: new Decimal(-53.0781424),
+    })
 
     vi.useFakeTimers()
   })
@@ -21,6 +34,8 @@ describe('Check-in service', () => {
     const { checkIn } = await checkInService.execute({
       userId: 'user-1',
       gymId: 'gym-1',
+      userLatitude: -23.7879528,
+      userLongitude: -53.0781424,
     })
 
     expect(checkIn.id).toEqual(expect.any(String))
@@ -32,12 +47,16 @@ describe('Check-in service', () => {
     await checkInService.execute({
       userId: 'user-1',
       gymId: 'gym-1',
+      userLatitude: -23.7879528,
+      userLongitude: -53.0781424,
     })
 
     await expect(() =>
       checkInService.execute({
         userId: 'user-1',
         gymId: 'gym-1',
+        userLatitude: -23.7879528,
+        userLongitude: -53.0781424,
       }),
     ).rejects.toBeInstanceOf(Error)
   })
@@ -48,15 +67,39 @@ describe('Check-in service', () => {
     await checkInService.execute({
       userId: 'user-1',
       gymId: 'gym-1',
+      userLatitude: -23.7879528,
+      userLongitude: -53.0781424,
     })
 
     vi.setSystemTime(new Date(2022, 0, 21, 8, 0, 0))
 
     const { checkIn } = await checkInService.execute({
       userId: 'user-1',
-      gymId: 'gym-2',
+      gymId: 'gym-1',
+      userLatitude: -23.7879528,
+      userLongitude: -53.0781424,
     })
 
     expect(checkIn.id).toEqual(expect.any(String))
+  })
+
+  it('should not be able to check in on distant gym', async () => {
+    gymsRepository.items.push({
+      id: 'gym-2',
+      title: 'JavaScript Gym',
+      description: '',
+      phone: '',
+      latitude: new Decimal(-23.777513),
+      longitude: new Decimal(-53.072388),
+    })
+
+    await expect(() =>
+      checkInService.execute({
+        userId: 'user-1',
+        gymId: 'gym-2',
+        userLatitude: -23.785251,
+        userLongitude: -53.070354,
+      }),
+    ).rejects.toBeInstanceOf(Error)
   })
 })
